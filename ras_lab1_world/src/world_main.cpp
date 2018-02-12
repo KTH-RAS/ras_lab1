@@ -41,6 +41,9 @@
 #include <geometry_msgs/Point.h>
 #include <kdl/frames.hpp>
 #include <kdl_conversions/kdl_msg.h>
+#include <std_srvs/Empty.h>
+#include <tf/transform_listener.h>
+#include <tf_conversions/tf_kdl.h>
 
 // Boost includes
 #include <stdio.h>
@@ -48,6 +51,51 @@
 
 // Random seed
 #include <ctime>
+bool reset_world = false;
+
+void initWorld(ros::NodeHandle &n, tf::TransformListener &listener, visualization_msgs::Marker &wall_marker, double angle_z)
+{
+  tf::StampedTransform kobuki_transform;
+  bool got_transform = false;
+
+  while (!got_transform)
+  {
+    try
+    {
+      listener.lookupTransform("/base_link", "/odom", ros::Time(0), kobuki_transform);
+      got_transform = true;
+    }
+    catch (tf::TransformException ex)
+    {
+      ROS_ERROR("%s",ex.what());
+      ros::Duration(1.0).sleep();
+    }
+  }
+
+  tf::Quaternion q = kobuki_transform.getRotation();
+  tf::Vector3 p = kobuki_transform.inverse().getOrigin();
+  ROS_INFO_STREAM("Kobuki angle: " << q.getAngle());
+  ROS_INFO_STREAM("Kobuki position: " << kobuki_transform.getOrigin().getX() << " " << kobuki_transform.getOrigin().getY() << " " << kobuki_transform.getOrigin().getZ());
+  angle_z += q.getAngle();
+
+  if(angle_z <= 5*M_PI/180.0 && angle_z >= 0.0) angle_z += 5*M_PI/180.0;
+  if(angle_z >= -5*M_PI/180.0 && angle_z <= 0.0) angle_z -= 5*M_PI/180.0;
+
+  KDL::Frame pose;
+  p.setX(p.getX() - 0.4*sin(angle_z));
+  p.setY(p.getY() + 0.4*cos(angle_z));
+  tf::vectorTFToKDL(p, pose.p);
+  pose.M = KDL::Rotation::RotZ(angle_z);
+  // pose.p[1] += 0.4;
+
+  tf::poseKDLToMsg(pose, wall_marker.pose);
+}
+
+bool reset(std_srvs::Empty::Request  &req, std_srvs::Empty::Response &res)
+{
+  reset_world = true;
+  return true;
+}
 
 int main(int argc, char **argv)
 {
@@ -55,19 +103,16 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "world_node");
     ros::NodeHandle n;
     ros::Rate r(10); // 50 Hz
+    visualization_msgs::Marker wall_marker;
+    tf::TransformListener listener;
 
     // Create random number generators
     srand(time(NULL));
     double angle_z = ((double)(rand()%40)-20)*M_PI/180.0;
-    if(angle_z <= 5*M_PI/180.0 && angle_z >= 0.0) angle_z += 5*M_PI/180.0;
-    if(angle_z >= -5*M_PI/180.0 && angle_z <= 0.0) angle_z -= 5*M_PI/180.0;
-
-    KDL::Frame pose;
-    pose.M = KDL::Rotation::RotZ(angle_z);
-    pose.p = KDL::Vector(0.0, 0.4+0.23/2, 0.1);
-
     ros::Publisher vis_pub = n.advertise<visualization_msgs::Marker>( "wall_marker", 0 );
-    visualization_msgs::Marker wall_marker;
+    ros::Publisher reset_pub = n.advertise<std_msgs::Empty>("reset_distance", 0);
+    ros::ServiceServer service = n.advertiseService("reset_world", reset);
+
     wall_marker.header.frame_id = "/odom";
     wall_marker.header.stamp = ros::Time();
     wall_marker.ns = "world";
@@ -81,17 +126,24 @@ int main(int argc, char **argv)
     wall_marker.color.r = (255.0/255.0);
     wall_marker.color.g = (0.0/255.0);
     wall_marker.color.b = (0.0/255.0);
-
-
-    tf::poseKDLToMsg(pose, wall_marker.pose);
+    initWorld(n, listener, wall_marker, angle_z);
 
     // Main loop.
     while (n.ok())
     {
         vis_pub.publish(wall_marker);
+        if (reset_world)
+        {
+          srand(time(NULL));
+          double angle_z = ((double)(rand()%40)-20)*M_PI/180.0;
+
+          initWorld(n, listener, wall_marker, angle_z);
+          reset_world = false;
+          reset_pub.publish(std_msgs::Empty());
+        }
         ros::spinOnce();
         r.sleep();
     }
 
     return 0;
-} 
+}

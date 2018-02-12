@@ -52,7 +52,7 @@ class GenerateDistanceNode
 public:
 
     ros::NodeHandle n_;
-    ros::Subscriber world_subscriber_;
+    ros::Subscriber world_subscriber_, reset_subscriber_;
     ros::Publisher dist_sensor_back_vis_pub_, adc_pub_;
     tf::TransformListener transform_listener_;
     geometry_msgs::Point wall_start_, wall_end_;
@@ -77,11 +77,17 @@ public:
     {
         distance_sensor_ = new DistanceSensor();
         world_subscriber_ = n_.subscribe("/wall_marker", 1, &GenerateDistanceNode::topicCallbackWallMarker, this);
+        reset_subscriber_ = n_.subscribe("/reset_distance", 1, &GenerateDistanceNode::topicCallbackReset, this);
         dist_sensor_back_vis_pub_ = n_.advertise<visualization_msgs::MarkerArray>( "dist_sensor_markers", 0 );
         max_sensor_range_ = 0.8; // meters
         min_sensor_range_ = 0.1;
         sensor_height_ = 0.1;
         adc_pub_ = n_.advertise<ras_lab1_msgs::ADConverter>("adc", 1);
+    }
+
+    void topicCallbackReset(const std_msgs::Empty::ConstPtr &msg)
+    {
+      wall_initialized_ = false;
     }
 
     void topicCallbackWallMarker(const visualization_msgs::Marker::ConstPtr &msg)

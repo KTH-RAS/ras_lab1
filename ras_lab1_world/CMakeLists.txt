@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(ras_lab1_world)
 
-find_package(catkin REQUIRED COMPONENTS roscpp std_msgs kdl_conversions)
+find_package(catkin REQUIRED COMPONENTS roscpp std_msgs kdl_conversions tf_conversions tf)
 find_package(Boost REQUIRED COMPONENTS random)
 find_package(orocos_kdl REQUIRED)
 
@@ -9,7 +9,7 @@ find_library(KDL_LIBRARY REQUIRED NAMES orocos-kdl HINTS ${orocos_kdl_LIBRARY_DI
 
 catkin_package(
   DEPENDS orocos_kdl
-  CATKIN_DEPENDS roscpp std_msgs kdl_conversions
+  CATKIN_DEPENDS roscpp std_msgs kdl_conversions tf_conversions tf
   INCLUDE_DIRS
 )
 
