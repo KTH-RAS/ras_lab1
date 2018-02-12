@@ -74,12 +74,14 @@ void initWorld(ros::NodeHandle &n, tf::TransformListener &listener, visualizatio
 
   tf::Quaternion q = kobuki_transform.getRotation();
   tf::Vector3 p = kobuki_transform.inverse().getOrigin();
+
   ROS_INFO_STREAM("Kobuki angle: " << q.getAngle());
+  ROS_INFO_STREAM("Kobuki axis: " << q.getAxis().getX() << " " << q.getAxis().getY() << " " << q.getAxis().getZ());
   ROS_INFO_STREAM("Kobuki position: " << kobuki_transform.getOrigin().getX() << " " << kobuki_transform.getOrigin().getY() << " " << kobuki_transform.getOrigin().getZ());
-  angle_z += q.getAngle();
 
   if(angle_z <= 5*M_PI/180.0 && angle_z >= 0.0) angle_z += 5*M_PI/180.0;
   if(angle_z >= -5*M_PI/180.0 && angle_z <= 0.0) angle_z -= 5*M_PI/180.0;
+  angle_z += q.getAngle()*(-q.getAxis().getZ());
 
   KDL::Frame pose;
   p.setX(p.getX() - 0.4*sin(angle_z));
